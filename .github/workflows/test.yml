@@ -17,5 +17,5 @@ jobs:
         with:
           go-version: 1.18
       - uses: actions/checkout@v3
-      - run: go build -mod vendor
-      - run: go test -mod vendor ./... -cover
+      - run: go build
+      - run: go test ./... -cover
