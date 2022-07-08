@@ -13,7 +13,12 @@ the duration specified by the `k8s-ttl-controller.twin.sh/ttl`.
 
 ## Deploying on Kubernetes
 ### Using Helm
-Coming soon
+For the chart associated to this project, see [TwiN/helm-charts](https://github.com/TwiN/helm-charts):
+```console
+helm repo add twin https://twin.github.io/helm-charts
+helm repo update
+helm install k8s-ttl-controller twin/k8s-ttl-controller
+```
 
 ### Using a YAML file
 ```yaml
