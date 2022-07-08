@@ -17,7 +17,7 @@ For the chart associated to this project, see [TwiN/helm-charts](https://github.
 ```console
 helm repo add twin https://twin.github.io/helm-charts
 helm repo update
-helm install k8s-ttl-controller twin/k8s-ttl-controller
+helm install k8s-ttl-controller twin/k8s-ttl-controller -n kube-system
 ```
 
 ### Using a YAML file
