@@ -42,7 +42,9 @@ rules:
     resources:
       - "*"
     verbs:
-      - "*"
+      - "get"
+      - "list"
+      - "delete"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
