@@ -13,7 +13,7 @@ import (
 
 // CreateClients initializes a Kubernetes client and a dynamic client using either the kubeconfig file
 // (if ENVIRONMENT is set to dev) or the in-cluster config otherwise.
-func CreateClients() (*kubernetes.Clientset, dynamic.Interface, error) {
+func CreateClients() (kubernetes.Interface, dynamic.Interface, error) {
 	var cfg *rest.Config
 	if os.Getenv("ENVIRONMENT") == "dev" {
 		var kubeconfig string
@@ -35,11 +35,11 @@ func CreateClients() (*kubernetes.Clientset, dynamic.Interface, error) {
 		}
 		cfg = clientConfig
 	}
+	cfg.WarningHandler = rest.NoWarnings{}
 	kubernetesClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	cfg.WarningHandler = rest.NoWarnings{}
 	dynamicClient, err := dynamic.NewForConfig(cfg)
 	if err != nil {
 		return nil, nil, err

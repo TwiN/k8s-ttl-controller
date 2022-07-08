@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -25,12 +27,18 @@ var (
 	ErrTimedOut = errors.New("execution timed out")
 
 	executionFailedCounter = 0
+
+	debug = os.Getenv("DEBUG") == "true"
 )
 
 func main() {
 	for {
 		start := time.Now()
-		if err := run(); err != nil {
+		kubernetesClient, dynamicClient, err := CreateClients()
+		if err != nil {
+			panic("failed to create Kubernetes clients: " + err.Error())
+		}
+		if err := Reconcile(kubernetesClient, dynamicClient); err != nil {
 			log.Printf("Error during execution: %s", err.Error())
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
@@ -45,23 +53,18 @@ func main() {
 	}
 }
 
-func run() error {
-	kubernetesClient, dynamicClient, err := CreateClients()
-	if err != nil {
-		return err
-	}
-	// Use Kubernetes' discovery API to retrieve all resources
-	resources, err := kubernetesClient.Discovery().ServerPreferredResources()
-	if err != nil {
-		return err
-	}
-	return Reconcile(dynamicClient, resources)
-}
-
 // Reconcile loops over all resources and deletes all sub resources that have expired
 //
 // Returns an error if an execution lasts for longer than ExecutionTimeout
-func Reconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourceList) error {
+func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Interface) error {
+	// Use Kubernetes' discovery API to retrieve all resources
+	_, resources, err := kubernetesClient.Discovery().ServerGroupsAndResources()
+	if err != nil {
+		return err
+	}
+	if debug {
+		fmt.Println("[Reconcile] Found", len(resources), "API resources")
+	}
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
 	go func() {
@@ -79,8 +82,7 @@ func Reconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourceL
 	}
 }
 
-// DoReconcile handles rolling upgrades by iterating over every single AutoScalingGroups' outdated
-// instances
+// DoReconcile goes over all API resources specified, retrieves all sub resources and deletes those who have expired
 func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourceList) bool {
 	for _, resource := range resources {
 		if len(resource.APIResources) == 0 {
