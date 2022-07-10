@@ -10,6 +10,7 @@ a value such as `30m`, `24h` and `7d`.
 The resource is deleted after the current timestamp surpasses the sum of the resource's `metadata.creationTimestamp` and 
 the duration specified by the `k8s-ttl-controller.twin.sh/ttl` annotation.
 
+
 ## Usage
 ### Setting a TTL on a resource
 To set a TTL on a resource, all you have to do is add the annotation `k8s-ttl-controller.twin.sh/ttl` on the resource
@@ -118,4 +119,44 @@ spec:
           imagePullPolicy: Always
 ```
 
+### Docker 
+```console
+docker pull ghcr.io/twin/k8s-ttl-controller
+```
 
+
+## Development
+First, you need to configure your kubeconfig to point to an existing, accessible cluster from your machine so that `kubectl` can be used.
+
+If you don't have one or wish to use a different cluster, you can create a kind cluster using the following command:
+```console
+make kind-create-cluster
+```
+Next, you must start k8s-ttl-controller locally:
+```console
+make run
+```
+
+To test the application, you can create any resource and annotate it with the `k8s-ttl-controller.twin.sh/ttl` annotation:
+```console
+kubectl run nginx --image=nginx
+kubectl annotate pod nginx k8s-ttl-controller.twin.sh/ttl=1h
+```
+You should then see something like this in the logs:
+```console
+2022/07/10 13:31:40 [pods/nginx] is configured with a TTL of 1h, which means it will expire in 57m10s
+```
+If you want to ensure that expired resources are properly deleted, you can simply set a very low TTL, such as:
+```console
+kubectl annotate pod nginx k8s-ttl-controller.twin.sh/ttl=1s
+```
+You would then see something like this in the logs:
+```console
+2022/07/10 13:36:53 [pods/nginx2] is configured with a TTL of 1s, which means it has expired 2m3s ago
+2022/07/10 13:36:53 [pods/nginx2] deleted
+```
+
+To clean up the kind cluster:
+```console
+make kind-clean
+```
