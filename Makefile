@@ -21,5 +21,5 @@ test:
 kind-create-cluster:
 	kind create cluster --name k8s-ttl-controller
 
-kind-clean: clean
+kind-clean:
 	kind delete cluster --name k8s-ttl-controller
