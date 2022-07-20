@@ -63,7 +63,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 		return err
 	}
 	if debug {
-		fmt.Println("[Reconcile] Found", len(resources), "API resources")
+		log.Println("[Reconcile] Found", len(resources), "API resources")
 	}
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
@@ -108,8 +108,11 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 			gvr.Resource = apiResource.Name
 			list, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 				continue
+			}
+			if debug {
+				log.Println("Checking", len(list.Items), gvr.Resource, "from", gvr.GroupVersion())
 			}
 			for _, item := range list.Items {
 				ttl, exists := item.GetAnnotations()[AnnotationTTL]
@@ -118,7 +121,7 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 				}
 				ttlInDuration, err := str2duration.ParseDuration(ttl)
 				if err != nil {
-					fmt.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
+					log.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
 					continue
 				}
 				ttlExpired := time.Now().After(item.GetCreationTimestamp().Add(ttlInDuration))
@@ -126,11 +129,13 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 					log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, time.Since(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
 					err := dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 					if err != nil {
-						fmt.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
+						log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
 						// XXX: Should we retry with GracePeriodSeconds set to &0 to force immediate deletion after the first attempt failed?
 					} else {
 						log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
 					}
+					// Cool off a tiny bit to avoid hitting the API too often
+					time.Sleep(50 * time.Millisecond)
 				} else {
 					log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
 				}
