@@ -19,8 +19,9 @@ import (
 const (
 	AnnotationTTL = "k8s-ttl-controller.twin.sh/ttl"
 
-	MaximumFailedExecutionBeforePanic = 10              // Maximum number of allowed failed executions before panicking
-	ExecutionInterval                 = 5 * time.Minute // Interval between each reconciliation
+	MaximumFailedExecutionBeforePanic = 10               // Maximum number of allowed failed executions before panicking
+	ExecutionTimeout                  = 10 * time.Minute // Maximum time for each reconciliation before timing out.
+	ExecutionInterval                 = 5 * time.Minute  // Interval between each reconciliation
 )
 
 var (
@@ -68,7 +69,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
 	go func() {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(ExecutionTimeout)
 		timeout <- true
 	}()
 	go func() {
