@@ -19,9 +19,10 @@ import (
 const (
 	AnnotationTTL = "k8s-ttl-controller.twin.sh/ttl"
 
-	MaximumFailedExecutionBeforePanic = 10               // Maximum number of allowed failed executions before panicking
-	ExecutionTimeout                  = 10 * time.Minute // Maximum time for each reconciliation before timing out
-	ExecutionInterval                 = 5 * time.Minute  // Interval between each reconciliation
+	MaximumFailedExecutionBeforePanic = 10                    // Maximum number of allowed failed executions before panicking
+	ExecutionTimeout                  = 10 * time.Minute      // Maximum time for each reconciliation before timing out
+	ExecutionInterval                 = 5 * time.Minute       // Interval between each reconciliation
+	ThrottleDuration                  = 50 * time.Millisecond // Duration to sleep for throttling purposes
 )
 
 var (
@@ -136,13 +137,13 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 						log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
 					}
 					// Cool off a tiny bit to avoid hitting the API too often
-					time.Sleep(50 * time.Millisecond)
+					time.Sleep(ThrottleDuration)
 				} else {
 					log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
 				}
 			}
 			// Cool off a tiny bit to avoid hitting the API too often
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(ThrottleDuration)
 		}
 	}
 	return true
