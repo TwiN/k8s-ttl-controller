@@ -28,6 +28,7 @@ const (
 var (
 	ErrTimedOut = errors.New("execution timed out")
 
+	listTimeoutSeconds     = int64(30)
 	executionFailedCounter = 0
 
 	debug = os.Getenv("DEBUG") == "true"
@@ -108,9 +109,9 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 			}
 			// List all items under the resource
 			gvr.Resource = apiResource.Name
-			list, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{})
+			list, err := dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &listTimeoutSeconds})
 			if err != nil {
-				log.Println(err)
+				log.Printf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err)
 				continue
 			}
 			if debug {
