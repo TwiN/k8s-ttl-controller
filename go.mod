@@ -1,6 +1,6 @@
 module github.com/TwiN/k8s-ttl-controller
 
-go 1.18
+go 1.19
 
 require (
 	github.com/xhit/go-str2duration/v2 v2.0.0
