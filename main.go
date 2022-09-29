@@ -45,7 +45,7 @@ func main() {
 			log.Printf("Error during execution: %s", err.Error())
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
-				panic(fmt.Errorf("execution failed %d times: %v", executionFailedCounter, err))
+				panic(fmt.Errorf("execution failed %d times: %w", executionFailedCounter, err))
 			}
 		} else if executionFailedCounter > 0 {
 			log.Printf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter)
