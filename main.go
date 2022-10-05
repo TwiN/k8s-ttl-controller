@@ -28,7 +28,7 @@ const (
 var (
 	ErrTimedOut = errors.New("execution timed out")
 
-	listTimeoutSeconds     = int64(30)
+	listTimeoutSeconds     = int64(60)
 	executionFailedCounter = 0
 
 	debug = os.Getenv("DEBUG") == "true"
