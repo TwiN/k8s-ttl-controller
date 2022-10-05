@@ -20,7 +20,7 @@ const (
 	AnnotationTTL = "k8s-ttl-controller.twin.sh/ttl"
 
 	MaximumFailedExecutionBeforePanic = 10                    // Maximum number of allowed failed executions before panicking
-	ExecutionTimeout                  = 10 * time.Minute      // Maximum time for each reconciliation before timing out
+	ExecutionTimeout                  = 20 * time.Minute      // Maximum time for each reconciliation before timing out
 	ExecutionInterval                 = 5 * time.Minute       // Interval between each reconciliation
 	ThrottleDuration                  = 50 * time.Millisecond // Duration to sleep for throttling purposes
 )
