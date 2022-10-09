@@ -36,6 +36,7 @@ func CreateClients() (kubernetes.Interface, dynamic.Interface, error) {
 		cfg = clientConfig
 	}
 	cfg.WarningHandler = rest.NoWarnings{}
+	cfg.UserAgent = "k8s-ttl-controller/1.0"
 	kubernetesClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return nil, nil, err
