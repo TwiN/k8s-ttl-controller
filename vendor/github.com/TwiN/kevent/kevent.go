@@ -27,7 +27,6 @@ func NewEventManager(kubernetesClient kubernetes.Interface, component string) *E
 		scheme:           runtime.NewScheme(),
 	}
 	em.broadcaster = record.NewBroadcaster()
-	em.broadcaster.StartStructuredLogging(4)
 	em.broadcaster.StartRecordingToSink(&typedv1core.EventSinkImpl{Interface: kubernetesClient.CoreV1().Events("")})
 	em.recorder = em.broadcaster.NewRecorder(em.scheme, corev1.EventSource{Component: component})
 	return em
@@ -51,4 +50,9 @@ func (em *EventManager) Create(resourceNamespace, resourceKind, resourceName, re
 		},
 	}
 	em.recorder.Event(us, eventType, reason, message)
+}
+
+// EnableDebugLogs enables debug logs for the EventManager.
+func (em *EventManager) EnableDebugLogs() {
+	em.broadcaster.StartStructuredLogging(4)
 }

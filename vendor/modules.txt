@@ -1,4 +1,4 @@
-# github.com/TwiN/kevent v0.1.0
+# github.com/TwiN/kevent v0.1.1
 ## explicit; go 1.19
 github.com/TwiN/kevent
 # github.com/davecgh/go-spew v1.1.1

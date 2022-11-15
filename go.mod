@@ -3,7 +3,7 @@ module github.com/TwiN/k8s-ttl-controller
 go 1.19
 
 require (
-	github.com/TwiN/kevent v0.1.0
+	github.com/TwiN/kevent v0.1.1
 	github.com/xhit/go-str2duration/v2 v2.0.0
 	k8s.io/api v0.25.4
 	k8s.io/apimachinery v0.25.4
