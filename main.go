@@ -9,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xhit/go-str2duration/v2"
+	"github.com/TwiN/kevent"
+	str2duration "github.com/xhit/go-str2duration/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -44,7 +45,8 @@ func main() {
 		if err != nil {
 			panic("failed to create Kubernetes clients: " + err.Error())
 		}
-		if err := Reconcile(kubernetesClient, dynamicClient); err != nil {
+		eventManager := kevent.NewEventManager(kubernetesClient, "k8s-ttl-controller")
+		if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
 			log.Printf("Error during execution: %s", err.Error())
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
@@ -62,7 +64,7 @@ func main() {
 // Reconcile loops over all resources and deletes all sub resources that have expired
 //
 // Returns an error if an execution lasts for longer than ExecutionTimeout
-func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Interface) error {
+func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Interface, eventManager *kevent.EventManager) error {
 	// Use Kubernetes' discovery API to retrieve all resources
 	_, resources, err := kubernetesClient.Discovery().ServerGroupsAndResources()
 	if err != nil {
@@ -78,7 +80,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 		timeout <- true
 	}()
 	go func() {
-		result <- DoReconcile(dynamicClient, resources)
+		result <- DoReconcile(dynamicClient, eventManager, resources)
 	}()
 	select {
 	case <-timeout:
@@ -89,7 +91,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 }
 
 // DoReconcile goes over all API resources specified, retrieves all sub resources and deletes those who have expired
-func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourceList) bool {
+func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventManager, resources []*metav1.APIResourceList) bool {
 	for _, resource := range resources {
 		if len(resource.APIResources) == 0 {
 			continue
@@ -139,13 +141,16 @@ func DoReconcile(dynamicClient dynamic.Interface, resources []*metav1.APIResourc
 					}
 					ttlExpired := time.Now().After(item.GetCreationTimestamp().Add(ttlInDuration))
 					if ttlExpired {
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, time.Since(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
+						durationSinceExpired := time.Since(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second)
+						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired)
 						err := dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 						if err != nil {
 							log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
+							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "FailedToDeleteExpiredTTL", "Unable to delete expired resource:"+err.Error(), true)
 							// XXX: Should we retry with GracePeriodSeconds set to &0 to force immediate deletion after the first attempt failed?
 						} else {
 							log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
+							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "DeletedExpiredTTL", "Deleted resource because "+ttl+" or more has elapsed", false)
 						}
 						// Cool off a tiny bit to avoid hitting the API too often
 						time.Sleep(ThrottleDuration)
