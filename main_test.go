@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/TwiN/kevent"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,6 +88,7 @@ func TestReconcile(t *testing.T) {
 		// Create clients
 		kubernetesClient := fakekubernetes.NewSimpleClientset()
 		dynamicClient := fakedynamic.NewSimpleDynamicClient(scheme)
+		eventManager := kevent.NewEventManager(kubernetesClient, "k8s-ttl-controller")
 
 		fakeDiscovery, _ := kubernetesClient.Discovery().(*fakediscovery.FakeDiscovery)
 		fakeDiscovery.Fake.Resources = []*metav1.APIResourceList{
@@ -119,7 +121,7 @@ func TestReconcile(t *testing.T) {
 				t.Errorf("expected 3 resources, got %d", len(list.Items))
 			}
 			// Reconcile once
-			if err := Reconcile(kubernetesClient, dynamicClient); err != nil {
+			if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			// Make sure that the expired resources have been deleted
