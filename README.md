@@ -167,3 +167,7 @@ To clean up the kind cluster:
 ```console
 make kind-clean
 ```
+
+
+## Debugging
+To enable debugging logs, you may set the `DEBUG` environment variable to `true`
