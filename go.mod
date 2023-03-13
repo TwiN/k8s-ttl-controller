@@ -1,6 +1,6 @@
 module github.com/TwiN/k8s-ttl-controller
 
-go 1.19
+go 1.20
 
 require (
 	github.com/TwiN/kevent v0.1.2
