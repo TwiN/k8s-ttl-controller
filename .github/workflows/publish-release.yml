@@ -24,7 +24,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           pull: true
           push: true
           tags: ${{ env.IMAGE_REPOSITORY }}:${{ env.RELEASE }},${{ env.IMAGE_REPOSITORY }}:stable
