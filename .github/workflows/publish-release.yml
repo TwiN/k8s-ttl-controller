@@ -8,7 +8,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v3
       - uses: docker/setup-qemu-action@v2
@@ -29,4 +29,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           pull: true
           push: true
-          tags: ${{ env.IMAGE_REPOSITORY }}:${{ env.RELEASE }},${{ env.IMAGE_REPOSITORY }}:stable
+          tags: |
+            ${{ env.IMAGE_REPOSITORY }}:${{ env.RELEASE }}
+            ${{ env.IMAGE_REPOSITORY }}:stable
+            ${{ env.IMAGE_REPOSITORY }}:latest
