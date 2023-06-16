@@ -6,7 +6,7 @@ require (
 	github.com/TwiN/kevent v0.1.2
 	github.com/xhit/go-str2duration/v2 v2.1.0
 	k8s.io/api v0.27.2
-	k8s.io/apimachinery v0.27.2
+	k8s.io/apimachinery v0.27.3
 	k8s.io/client-go v0.27.2
 )
 
