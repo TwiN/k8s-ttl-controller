@@ -4,6 +4,7 @@ BINARY=k8s-ttl-controller
 
 build:
 	go build -o $(BINARY) .
+	echo "this is a test"
 
 clean:
 	-rm $(BINARY)
