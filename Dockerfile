@@ -1,6 +1,7 @@
 FROM golang:alpine AS builder
 WORKDIR /app
 ADD . ./
+RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o k8s-ttl-controller .
 RUN apk --update add ca-certificates
 
