@@ -46,3 +46,31 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: v1.62.0
+
+  docker-build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: twin/k8s-ttl-controller
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Prepare Image Metadata
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+      - name: Set Up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set Up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Test Multi-Arch Building Of Image
+        uses: docker/build-push-action@v6
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          annotations: ${{ steps.metadata.outputs.annotations }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          tags: ${{ steps.metadata.outputs.tags }}
