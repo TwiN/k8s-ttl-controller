@@ -21,5 +21,12 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
           go-version-file: go.mod
-      - run: go build
-      - run: go test ./... -cover
+      - name: Build
+        run: go build -v ./...
+      - name: Run Tests
+        run: go test -json ./... > test-results.jsonå
+      - name: Annotate Tests
+        if: always()
+        uses: guyarb/golang-test-annotations@v0.8.0
+        with:
+          test-results: test-results.json
