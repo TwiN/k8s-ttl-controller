@@ -9,7 +9,7 @@ on:
     paths-ignore:
       - '*.md'
 jobs:
-  test:
+  unit-testing:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -30,3 +30,19 @@ jobs:
         uses: guyarb/golang-test-annotations@v0.8.0
         with:
           test-results: test-results.json
+
+  linting:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          cache: true
+          cache-dependency-path: go.sum
+          go-version-file: go.mod
+      - name: Run Linter
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.62.0
