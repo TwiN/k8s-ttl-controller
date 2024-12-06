@@ -20,7 +20,7 @@ import (
 
 const (
 	AnnotationTTL         = "k8s-ttl-controller.twin.sh/ttl"
-	AnnotationRefreshedAt = "8s-ttl-controller.twin.sh/refreshed-at"
+	AnnotationRefreshedAt = "k8s-ttl-controller.twin.sh/refreshed-at"
 
 	MaximumFailedExecutionBeforePanic = 10                    // Maximum number of allowed failed executions before panicking
 	ExecutionTimeout                  = 20 * time.Minute      // Maximum time for each reconciliation before timing out
