@@ -10,6 +10,8 @@ a value such as `30m`, `24h` and `7d`.
 The resource is deleted after the current timestamp surpasses the sum of the resource's `metadata.creationTimestamp` and 
 the duration specified by the `k8s-ttl-controller.twin.sh/ttl` annotation.
 
+If the resource is annotated with `k8s-ttl-controller.twin.sh/refreshed-at`, the TTL will be calculated from the value of
+this annotation instead of the `metadata.creationTimestamp`.
 
 ## Usage
 ### Setting a TTL on a resource
