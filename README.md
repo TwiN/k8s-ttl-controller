@@ -25,7 +25,7 @@ kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/ttl=1h
 The pod `hello-world` would be deleted in approximately 40 minutes, because 20 minutes have already elapsed, leaving
 40 minutes until the target TTL of 1h is reached.
 
-In the very same you can refresh TTL by placing annotation `k8s-ttl-controller.twin.sh/refreshed-at` like:
+In the same way, you can refresh the TTL by placing the annotation `k8s-ttl-controller.twin.sh/refreshed-at`, like this:
 ```console
 kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 ```
