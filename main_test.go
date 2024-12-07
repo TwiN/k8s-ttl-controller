@@ -168,7 +168,7 @@ func TestReconcile(t *testing.T) {
 				t.Errorf("expected 3 resources, got %d", len(list.Items))
 			}
 			// Reconcile once
-			if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
+			if err = Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			// Make sure that the expired resources have been deleted
