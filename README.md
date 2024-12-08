@@ -27,6 +27,8 @@ The pod `hello-world` would be deleted in approximately 40 minutes, because 20 m
 
 In the same way, you can refresh the TTL by placing the annotation `k8s-ttl-controller.twin.sh/refreshed-at`, like this:
 ```console
+kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=2024-12-08T20:48:11Z
+# Alternatively:
 kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 ```
 
