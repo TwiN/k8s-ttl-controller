@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	AnnotationTTL = "k8s-ttl-controller.twin.sh/ttl"
+	AnnotationTTL         = "k8s-ttl-controller.twin.sh/ttl"
+	AnnotationRefreshedAt = "k8s-ttl-controller.twin.sh/refreshed-at"
 
 	MaximumFailedExecutionBeforePanic = 10                    // Maximum number of allowed failed executions before panicking
 	ExecutionTimeout                  = 20 * time.Minute      // Maximum time for each reconciliation before timing out
@@ -90,6 +91,18 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 	}
 }
 
+func getStartTime(item unstructured.Unstructured) metav1.Time {
+	refreshedAt, exists := item.GetAnnotations()[AnnotationRefreshedAt]
+	if exists {
+		t, err := time.Parse(time.RFC3339, refreshedAt)
+		if err == nil {
+			return metav1.NewTime(t)
+		}
+		log.Printf("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
+	}
+	return item.GetCreationTimestamp()
+}
+
 // DoReconcile goes over all API resources specified, retrieves all sub resources and deletes those who have expired
 func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventManager, resources []*metav1.APIResourceList) bool {
 	for _, resource := range resources {
@@ -116,6 +129,7 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 			gvr.Resource = apiResource.Name
 			var list *unstructured.UnstructuredList
 			var continueToken string
+			var ttlInDuration time.Duration
 			var err error
 			for list == nil || continueToken != "" {
 				list, err = dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &listTimeoutSeconds, Continue: continueToken, Limit: ListLimit})
@@ -134,16 +148,16 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 					if !exists {
 						continue
 					}
-					ttlInDuration, err := str2duration.ParseDuration(ttl)
+					ttlInDuration, err = str2duration.ParseDuration(ttl)
 					if err != nil {
 						log.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
 						continue
 					}
-					ttlExpired := time.Now().After(item.GetCreationTimestamp().Add(ttlInDuration))
+					ttlExpired := time.Now().After(getStartTime(item).Add(ttlInDuration))
 					if ttlExpired {
-						durationSinceExpired := time.Since(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second)
+						durationSinceExpired := time.Since(getStartTime(item).Add(ttlInDuration)).Round(time.Second)
 						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired)
-						err := dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
+						err = dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 						if err != nil {
 							log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "FailedToDeleteExpiredTTL", "Unable to delete expired resource:"+err.Error(), true)

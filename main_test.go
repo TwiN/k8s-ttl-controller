@@ -81,6 +81,53 @@ func TestReconcile(t *testing.T) {
 			},
 			expectedResourcesLeftAfterReconciliation: 2,
 		},
+		{
+			name: "expired-pod-is-deleted-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "5m", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 0,
+		},
+		{
+			name: "not-expired-pod-is-not-deleted-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "not-expired-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "3d", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 1,
+		},
+		{
+			name: "unannotated-pod-is-not-deleted-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "unannotated-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 1,
+		},
+		{
+			name: "one-out-of-two-pods-is-deleted-because-only-one-expired-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "not-expired-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "3d", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "5m", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 1,
+		},
+		{
+			name: "multiple-expired-pods-are-deleted-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name-1", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "5m", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name-2", time.Now().Add(-72*time.Hour), map[string]interface{}{AnnotationTTL: "2d", AnnotationRefreshedAt: time.Now().Add(-49 * time.Hour).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 0,
+		},
+		{
+			name: "only-expired-pods-are-deleted-by-refreshed-at",
+			podsToCreate: []*unstructured.Unstructured{
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name-1", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "5m", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "not-expired-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationTTL: "3d", AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "expired-pod-name-2", time.Now().Add(-72*time.Hour), map[string]interface{}{AnnotationTTL: "2d", AnnotationRefreshedAt: time.Now().Add(-49 * time.Hour).Format(time.RFC3339)}),
+				newUnstructuredWithAnnotations("v1", "Pod", "default", "unannotated-pod-name", time.Now().Add(-time.Hour), map[string]interface{}{AnnotationRefreshedAt: time.Now().Add(-10 * time.Minute).Format(time.RFC3339)}),
+			},
+			expectedResourcesLeftAfterReconciliation: 2,
+		},
 	}
 
 	// Run scenarios
@@ -121,7 +168,7 @@ func TestReconcile(t *testing.T) {
 				t.Errorf("expected 3 resources, got %d", len(list.Items))
 			}
 			// Reconcile once
-			if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
+			if err = Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			// Make sure that the expired resources have been deleted
