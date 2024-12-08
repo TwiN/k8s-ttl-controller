@@ -25,13 +25,6 @@ kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/ttl=1h
 The pod `hello-world` would be deleted in approximately 40 minutes, because 20 minutes have already elapsed, leaving
 40 minutes until the target TTL of 1h is reached.
 
-In the same way, you can refresh the TTL by placing the annotation `k8s-ttl-controller.twin.sh/refreshed-at`, like this:
-```console
-kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=2024-12-08T20:48:11Z
-# Alternatively:
-kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-```
-
 Alternatively, you can create resources with the annotation already present:
 ```yaml
 apiVersion: v1
@@ -49,6 +42,16 @@ The above would cause the pod to be deleted 1 hour after its creation.
 
 This is especially useful if you want to create temporary resources without having to worry about unnecessary
 resources accumulating over time.
+
+You can delay a resource from being deleted by using the `k8s-ttl-controller.twin.sh/refreshed-at` annotation, as 
+the value of said annotation will be used instead of `metadata.creationTimestamp` to calculate the TTL:
+```console
+kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=2024-12-08T20:48:11Z
+```
+You can use the following to save yourself from timezone shenanigans:
+```console
+kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+```
 
 
 ## Deploying on Kubernetes
