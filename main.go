@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/TwiN/kevent"
+	"github.com/sirupsen/logrus"
 	str2duration "github.com/xhit/go-str2duration/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -36,28 +35,42 @@ var (
 	listTimeoutSeconds     = int64(60)
 	executionFailedCounter = 0
 
-	debug = os.Getenv("DEBUG") == "true"
+	debug    = os.Getenv("DEBUG") == "true"
+	jsonLogs = os.Getenv("JSON_LOGS") == "true"
 )
+
+func init() {
+	if jsonLogs {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	} else {
+		logrus.SetFormatter(&logrus.TextFormatter{})
+	}
+	if debug {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+}
 
 func main() {
 	for {
 		start := time.Now()
 		kubernetesClient, dynamicClient, err := CreateClients()
 		if err != nil {
-			panic("failed to create Kubernetes clients: " + err.Error())
+			logrus.WithError(err).Panic("failed to create Kubernetes clients")
 		}
 		eventManager := kevent.NewEventManager(kubernetesClient, "k8s-ttl-controller")
-		if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
-			log.Printf("Error during execution: %s", err.Error())
+		if err = Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
+			logrus.WithError(err).Error("Error during execution")
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
-				panic(fmt.Errorf("execution failed %d times: %w", executionFailedCounter, err))
+				logrus.WithError(err).Panicf("execution failed %d times", executionFailedCounter)
 			}
 		} else if executionFailedCounter > 0 {
-			log.Printf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter)
+			logrus.Infof("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter)
 			executionFailedCounter = 0
 		}
-		log.Printf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval)
+		logrus.Infof("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval)
 		time.Sleep(ExecutionInterval)
 	}
 }
@@ -72,7 +85,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 		return err
 	}
 	if debug {
-		log.Println("[Reconcile] Found", len(resources), "API resources")
+		logrus.Debugf("[Reconcile] Found %d API resources", len(resources))
 	}
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
@@ -98,7 +111,10 @@ func getStartTime(item unstructured.Unstructured) metav1.Time {
 		if err == nil {
 			return metav1.NewTime(t)
 		}
-		log.Printf("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
+		logrus.WithFields(logrus.Fields{
+			"kind": item.GetKind(),
+			"name": item.GetName(),
+		}).Warnf("Failed to parse refreshed-at timestamp '%s': %s", refreshedAt, err)
 	}
 	return item.GetCreationTimestamp()
 }
@@ -134,14 +150,17 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 			for list == nil || continueToken != "" {
 				list, err = dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &listTimeoutSeconds, Continue: continueToken, Limit: ListLimit})
 				if err != nil {
-					log.Printf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err)
+					logrus.WithFields(logrus.Fields{
+						"resource":     gvr.Resource,
+						"groupVersion": gvr.GroupVersion(),
+					}).Errorf("Error checking: %s", err)
 					continue
 				}
 				if list != nil {
 					continueToken = list.GetContinue()
 				}
 				if debug {
-					log.Println("Checking", len(list.Items), gvr.Resource, "from", gvr.GroupVersion())
+					logrus.Debugf("Checking %d %s from %s", len(list.Items), gvr.Resource, gvr.GroupVersion())
 				}
 				for _, item := range list.Items {
 					ttl, exists := item.GetAnnotations()[AnnotationTTL]
@@ -150,26 +169,44 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 					}
 					ttlInDuration, err = str2duration.ParseDuration(ttl)
 					if err != nil {
-						log.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
+						logrus.WithFields(logrus.Fields{
+							"resource": apiResource.Name,
+							"name":     item.GetName(),
+						}).Warnf("Invalid TTL '%s': %s", ttl, err)
 						continue
 					}
 					ttlExpired := time.Now().After(getStartTime(item).Add(ttlInDuration))
 					if ttlExpired {
 						durationSinceExpired := time.Since(getStartTime(item).Add(ttlInDuration)).Round(time.Second)
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired)
+						logrus.WithFields(logrus.Fields{
+							"resource":     apiResource.Name,
+							"name":         item.GetName(),
+							"ttl":          ttl,
+							"expiredSince": durationSinceExpired,
+						}).Info("Resource has expired")
 						err = dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 						if err != nil {
-							log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
+							logrus.WithFields(logrus.Fields{
+								"resource": apiResource.Name,
+								"name":     item.GetName(),
+							}).Errorf("Failed to delete: %s", err)
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "FailedToDeleteExpiredTTL", "Unable to delete expired resource:"+err.Error(), true)
-							// XXX: Should we retry with GracePeriodSeconds set to &0 to force immediate deletion after the first attempt failed?
 						} else {
-							log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
+							logrus.WithFields(logrus.Fields{
+								"resource": apiResource.Name,
+								"name":     item.GetName(),
+							}).Info("Resource deleted")
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "DeletedExpiredTTL", "Deleted resource because "+ttl+" or more has elapsed", false)
 						}
 						// Cool off a tiny bit to avoid hitting the API too often
 						time.Sleep(ThrottleDuration)
 					} else {
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
+						logrus.WithFields(logrus.Fields{
+							"resource":  apiResource.Name,
+							"name":      item.GetName(),
+							"ttl":       ttl,
+							"expiresIn": time.Until(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second),
+						}).Info("Resource will expire")
 					}
 				}
 				// Cool off a tiny bit to avoid hitting the API too often
