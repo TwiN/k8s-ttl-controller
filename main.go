@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"strings"
@@ -70,10 +69,10 @@ func main() {
 				panic(fmt.Errorf("execution failed %d times: %w", executionFailedCounter, err))
 			}
 		} else if executionFailedCounter > 0 {
-			log.Printf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter)
+			logger.Info(fmt.Sprintf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter))
 			executionFailedCounter = 0
 		}
-		log.Printf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval)
+		logger.Info(fmt.Sprintf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval))
 		time.Sleep(ExecutionInterval)
 	}
 }
@@ -148,7 +147,7 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 			for list == nil || continueToken != "" {
 				list, err = dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &listTimeoutSeconds, Continue: continueToken, Limit: ListLimit})
 				if err != nil {
-					log.Printf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err)
+					logger.Info(fmt.Sprintf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err))
 					continue
 				}
 				if list != nil {
@@ -162,26 +161,26 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 					}
 					ttlInDuration, err = str2duration.ParseDuration(ttl)
 					if err != nil {
-						log.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
+						logger.Info(fmt.Sprintf("[%s/%s] has an invalid TTL '%s': %s", apiResource.Name, item.GetName(), ttl, err))
 						continue
 					}
 					ttlExpired := time.Now().After(getStartTime(item).Add(ttlInDuration))
 					if ttlExpired {
 						durationSinceExpired := time.Since(getStartTime(item).Add(ttlInDuration)).Round(time.Second)
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired)
+						logger.Info(fmt.Sprintf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired))
 						err = dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 						if err != nil {
-							log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
+							logger.Info(fmt.Sprintf("[%s/%s] failed to delete: %s", apiResource.Name, item.GetName(), err))
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "FailedToDeleteExpiredTTL", "Unable to delete expired resource:"+err.Error(), true)
 							// XXX: Should we retry with GracePeriodSeconds set to &0 to force immediate deletion after the first attempt failed?
 						} else {
-							log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
+							logger.Info(fmt.Sprintf("[%s/%s] deleted", apiResource.Name, item.GetName()))
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "DeletedExpiredTTL", "Deleted resource because "+ttl+" or more has elapsed", false)
 						}
 						// Cool off a tiny bit to avoid hitting the API too often
 						time.Sleep(ThrottleDuration)
 					} else {
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(getStartTime(item).Add(ttlInDuration)).Round(time.Second))
+						logger.Info(fmt.Sprintf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(getStartTime(item).Add(ttlInDuration)).Round(time.Second))
 					}
 				}
 				// Cool off a tiny bit to avoid hitting the API too often
