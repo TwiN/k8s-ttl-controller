@@ -169,7 +169,7 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 						// Cool off a tiny bit to avoid hitting the API too often
 						time.Sleep(ThrottleDuration)
 					} else {
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(item.GetCreationTimestamp().Add(ttlInDuration)).Round(time.Second))
+						log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(getStartTime(item).Add(ttlInDuration)).Round(time.Second))
 					}
 				}
 				// Cool off a tiny bit to avoid hitting the API too often
