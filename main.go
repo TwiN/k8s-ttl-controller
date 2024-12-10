@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -36,8 +37,23 @@ var (
 	listTimeoutSeconds     = int64(60)
 	executionFailedCounter = 0
 
-	debug = os.Getenv("DEBUG") == "true"
+	logger       *slog.Logger  // Global logger
+	programLevel slog.LevelVar // Info by default
 )
+
+func init() {
+	// Create a new logger, either in JSON or text format
+	if os.Getenv("JSON_LOG") == "true" {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	}
+
+	// Set the log level based on the DEBUG environment variable
+	if os.Getenv("DEBUG") == "true" {
+		programLevel.Set(slog.LevelDebug)
+	}
+}
 
 func main() {
 	for {
@@ -47,8 +63,8 @@ func main() {
 			panic("failed to create Kubernetes clients: " + err.Error())
 		}
 		eventManager := kevent.NewEventManager(kubernetesClient, "k8s-ttl-controller")
-		if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
-			log.Printf("Error during execution: %s", err.Error())
+		if err = Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
+			logger.Info(fmt.Sprintf("Error during execution: %s", err.Error()))
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
 				panic(fmt.Errorf("execution failed %d times: %w", executionFailedCounter, err))
@@ -71,9 +87,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 	if err != nil {
 		return err
 	}
-	if debug {
-		log.Println("[Reconcile] Found", len(resources), "API resources")
-	}
+	logger.Debug(fmt.Sprintf("[Reconcile] Found %d API resources", len(resources)))
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
 	go func() {
@@ -98,7 +112,7 @@ func getStartTime(item unstructured.Unstructured) metav1.Time {
 		if err == nil {
 			return metav1.NewTime(t)
 		}
-		log.Printf("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
+		logger.Info("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
 	}
 	return item.GetCreationTimestamp()
 }
@@ -140,9 +154,7 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 				if list != nil {
 					continueToken = list.GetContinue()
 				}
-				if debug {
-					log.Println("Checking", len(list.Items), gvr.Resource, "from", gvr.GroupVersion())
-				}
+				logger.Debug(fmt.Sprintf("Checking %d %s from %s", len(list.Items), gvr.Resource, gvr.GroupVersion()))
 				for _, item := range list.Items {
 					ttl, exists := item.GetAnnotations()[AnnotationTTL]
 					if !exists {
