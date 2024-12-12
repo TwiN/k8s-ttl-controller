@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -36,8 +36,23 @@ var (
 	listTimeoutSeconds     = int64(60)
 	executionFailedCounter = 0
 
-	debug = os.Getenv("DEBUG") == "true"
+	logger       *slog.Logger  // Global logger
+	programLevel slog.LevelVar // Info by default
 )
+
+func init() {
+	// Create a new logger, either in JSON or text format
+	if os.Getenv("JSON_LOG") == "true" {
+		logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stderr, nil))
+	}
+
+	// Set the log level based on the DEBUG environment variable
+	if os.Getenv("DEBUG") == "true" {
+		programLevel.Set(slog.LevelDebug)
+	}
+}
 
 func main() {
 	for {
@@ -47,17 +62,17 @@ func main() {
 			panic("failed to create Kubernetes clients: " + err.Error())
 		}
 		eventManager := kevent.NewEventManager(kubernetesClient, "k8s-ttl-controller")
-		if err := Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
-			log.Printf("Error during execution: %s", err.Error())
+		if err = Reconcile(kubernetesClient, dynamicClient, eventManager); err != nil {
+			logger.Info(fmt.Sprintf("Error during execution: %s", err.Error()))
 			executionFailedCounter++
 			if executionFailedCounter > MaximumFailedExecutionBeforePanic {
 				panic(fmt.Errorf("execution failed %d times: %w", executionFailedCounter, err))
 			}
 		} else if executionFailedCounter > 0 {
-			log.Printf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter)
+			logger.Info(fmt.Sprintf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter))
 			executionFailedCounter = 0
 		}
-		log.Printf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval)
+		logger.Info(fmt.Sprintf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval))
 		time.Sleep(ExecutionInterval)
 	}
 }
@@ -71,9 +86,7 @@ func Reconcile(kubernetesClient kubernetes.Interface, dynamicClient dynamic.Inte
 	if err != nil {
 		return err
 	}
-	if debug {
-		log.Println("[Reconcile] Found", len(resources), "API resources")
-	}
+	logger.Debug(fmt.Sprintf("[Reconcile] Found %d API resources", len(resources)))
 	timeout := make(chan bool, 1)
 	result := make(chan bool, 1)
 	go func() {
@@ -98,7 +111,7 @@ func getStartTime(item unstructured.Unstructured) metav1.Time {
 		if err == nil {
 			return metav1.NewTime(t)
 		}
-		log.Printf("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
+		logger.Info("Failed to parse refreshed-at timestamp '%s' for %s/%s: %s", refreshedAt, item.GetKind(), item.GetName(), err)
 	}
 	return item.GetCreationTimestamp()
 }
@@ -134,15 +147,13 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 			for list == nil || continueToken != "" {
 				list, err = dynamicClient.Resource(gvr).List(context.TODO(), metav1.ListOptions{TimeoutSeconds: &listTimeoutSeconds, Continue: continueToken, Limit: ListLimit})
 				if err != nil {
-					log.Printf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err)
+					logger.Info(fmt.Sprintf("Error checking %s from %s: %s", gvr.Resource, gvr.GroupVersion(), err))
 					continue
 				}
 				if list != nil {
 					continueToken = list.GetContinue()
 				}
-				if debug {
-					log.Println("Checking", len(list.Items), gvr.Resource, "from", gvr.GroupVersion())
-				}
+				logger.Debug(fmt.Sprintf("Checking %d %s from %s", len(list.Items), gvr.Resource, gvr.GroupVersion()))
 				for _, item := range list.Items {
 					ttl, exists := item.GetAnnotations()[AnnotationTTL]
 					if !exists {
@@ -150,26 +161,26 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 					}
 					ttlInDuration, err = str2duration.ParseDuration(ttl)
 					if err != nil {
-						log.Printf("[%s/%s] has an invalid TTL '%s': %s\n", apiResource.Name, item.GetName(), ttl, err)
+						logger.Info(fmt.Sprintf("[%s/%s] has an invalid TTL '%s': %s", apiResource.Name, item.GetName(), ttl, err))
 						continue
 					}
 					ttlExpired := time.Now().After(getStartTime(item).Add(ttlInDuration))
 					if ttlExpired {
 						durationSinceExpired := time.Since(getStartTime(item).Add(ttlInDuration)).Round(time.Second)
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired)
+						logger.Info(fmt.Sprintf("[%s/%s] is configured with a TTL of %s, which means it has expired %s ago", apiResource.Name, item.GetName(), ttl, durationSinceExpired))
 						err = dynamicClient.Resource(gvr).Namespace(item.GetNamespace()).Delete(context.TODO(), item.GetName(), metav1.DeleteOptions{})
 						if err != nil {
-							log.Printf("[%s/%s] failed to delete: %s\n", apiResource.Name, item.GetName(), err)
+							logger.Info(fmt.Sprintf("[%s/%s] failed to delete: %s", apiResource.Name, item.GetName(), err))
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "FailedToDeleteExpiredTTL", "Unable to delete expired resource:"+err.Error(), true)
 							// XXX: Should we retry with GracePeriodSeconds set to &0 to force immediate deletion after the first attempt failed?
 						} else {
-							log.Printf("[%s/%s] deleted", apiResource.Name, item.GetName())
+							logger.Info(fmt.Sprintf("[%s/%s] deleted", apiResource.Name, item.GetName()))
 							eventManager.Create(item.GetNamespace(), item.GetKind(), item.GetName(), "DeletedExpiredTTL", "Deleted resource because "+ttl+" or more has elapsed", false)
 						}
 						// Cool off a tiny bit to avoid hitting the API too often
 						time.Sleep(ThrottleDuration)
 					} else {
-						log.Printf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(getStartTime(item).Add(ttlInDuration)).Round(time.Second))
+						logger.Info(fmt.Sprintf("[%s/%s] is configured with a TTL of %s, which means it will expire in %s", apiResource.Name, item.GetName(), ttl, time.Until(getStartTime(item).Add(ttlInDuration)).Round(time.Second)))
 					}
 				}
 				// Cool off a tiny bit to avoid hitting the API too often
