@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/TwiN/kevent"
-	str2duration "github.com/xhit/go-str2duration/v2"
+	"github.com/xhit/go-str2duration/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -38,6 +38,8 @@ var (
 
 	logger       *slog.Logger  // Global logger
 	programLevel slog.LevelVar // Info by default
+
+	trackableResources []string
 )
 
 func init() {
@@ -52,6 +54,12 @@ func init() {
 	if os.Getenv("DEBUG") == "true" {
 		programLevel.Set(slog.LevelDebug)
 	}
+
+	// Parse the trackable resources from the environment
+	if os.Getenv("TRACKABLE_RESOURCES") != "" {
+		trackableResources = strings.Split(os.Getenv("TRACKABLE_RESOURCES"), ",")
+	}
+
 }
 
 func main() {
@@ -116,6 +124,15 @@ func getStartTime(item unstructured.Unstructured) metav1.Time {
 	return item.GetCreationTimestamp()
 }
 
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
 // DoReconcile goes over all API resources specified, retrieves all sub resources and deletes those who have expired
 func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventManager, resources []*metav1.APIResourceList) bool {
 	for _, resource := range resources {
@@ -133,6 +150,10 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 			continue
 		}
 		for _, apiResource := range resource.APIResources {
+			// Skip resources that are not in the list of trackable resources
+			if len(trackableResources) != 0 && !contains(trackableResources, apiResource.Name) {
+				continue
+			}
 			// Make sure that we can list and delete the resource. If we can't, then there's no point querying it.
 			verbs := apiResource.Verbs.String()
 			if !strings.Contains(verbs, "list") || !strings.Contains(verbs, "delete") {
