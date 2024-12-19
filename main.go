@@ -39,7 +39,7 @@ var (
 	logger       *slog.Logger  // Global logger
 	programLevel slog.LevelVar // Info by default
 
-	trackableResources []string
+	apiResourcesToWatch []string
 )
 
 func init() {
@@ -56,8 +56,8 @@ func init() {
 	}
 
 	// Parse the trackable resources from the environment
-	if os.Getenv("TRACKABLE_RESOURCES") != "" {
-		trackableResources = strings.Split(os.Getenv("TRACKABLE_RESOURCES"), ",")
+	if os.Getenv("API_RESOURCES_TO_WATCH") != "" {
+		apiResourcesToWatch = strings.Split(os.Getenv("API_RESOURCES_TO_WATCH"), ",")
 	}
 
 }
@@ -151,7 +151,7 @@ func DoReconcile(dynamicClient dynamic.Interface, eventManager *kevent.EventMana
 		}
 		for _, apiResource := range resource.APIResources {
 			// Skip resources that are not in the list of trackable resources
-			if len(trackableResources) != 0 && !contains(trackableResources, apiResource.Name) {
+			if len(apiResourcesToWatch) != 0 && !contains(apiResourcesToWatch, apiResource.Name) {
 				continue
 			}
 			// Make sure that we can list and delete the resource. If we can't, then there's no point querying it.
