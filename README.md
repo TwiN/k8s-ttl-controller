@@ -53,6 +53,12 @@ You can use the following to save yourself from timezone shenanigans:
 kubectl annotate pod hello-world k8s-ttl-controller.twin.sh/refreshed-at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 ```
 
+You can use environment variable `API_RESOURCES_TO_WATCH` to specify the resources to watch. By default, the controller watches
+all resources in the cluster. You can specify a comma-separated list of resources to watch, such as `pods,deployments`.
+
+```console
+export API_RESOURCES_TO_WATCH=pods,deployments
+```
 
 ## Deploying on Kubernetes
 ### Using Helm

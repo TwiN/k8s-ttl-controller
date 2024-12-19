@@ -28,6 +28,8 @@ const (
 	ThrottleDuration                  = 50 * time.Millisecond // Duration to sleep for throttling purposes
 
 	ListLimit = 500 // Maximum number of items to list at once
+
+	APIResourcesToWatchEnv = "API_RESOURCES_TO_WATCH"
 )
 
 var (
@@ -56,8 +58,8 @@ func init() {
 	}
 
 	// Parse the trackable resources from the environment
-	if os.Getenv("API_RESOURCES_TO_WATCH") != "" {
-		apiResourcesToWatch = strings.Split(os.Getenv("API_RESOURCES_TO_WATCH"), ",")
+	if os.Getenv(APIResourcesToWatchEnv) != "" {
+		apiResourcesToWatch = strings.Split(os.Getenv(APIResourcesToWatchEnv), ",")
 	}
 
 }
