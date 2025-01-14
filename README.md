@@ -1,5 +1,5 @@
 # k8s-ttl-controller
-![test](https://github.com/TwiN/k8s-ttl-controller/workflows/test/badge.svg?branch=master)
+![test](https://github.com/TwiN/k8s-ttl-controller/actions/workflows/test.yml/badge.svg)
 
 This application allow you to specify a TTL (time to live) on your Kubernetes resources. Once the TTL is reached,
 the resource will be automatically deleted.
