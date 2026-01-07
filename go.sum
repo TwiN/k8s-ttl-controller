@@ -1,5 +1,5 @@
-github.com/TwiN/kevent v0.2.2 h1:CPx51EMheHZGrVdhxEDgNOsdrtk754kXaXAD6ZLAVvU=
-github.com/TwiN/kevent v0.2.2/go.mod h1:zYOwgtYUHPGXQARQaRWAp0hTNR5Pa3ALZhsSOhmbdxg=
+github.com/TwiN/kevent v0.2.3 h1:cHrSYoCmEri5dJ12MEfIt4Eur16VSoORrA6Df6QLvr0=
+github.com/TwiN/kevent v0.2.3/go.mod h1:fLLJhs06BLSbg1fAIW9ov+tod1ATiP2Lo7tA6enl34w=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
