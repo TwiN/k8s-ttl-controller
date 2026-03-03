@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +30,8 @@ const (
 
 	ListLimit = 500 // Maximum number of items to list at once
 
-	APIResourcesToWatchEnv = "API_RESOURCES_TO_WATCH"
+	APIResourcesToWatchEnv     = "API_RESOURCES_TO_WATCH"
+	ExecutionIntervalMinutesEnv = "EXECUTION_INTERVAL_MINUTES"
 )
 
 var (
@@ -37,6 +39,7 @@ var (
 
 	listTimeoutSeconds     = int64(60)
 	executionFailedCounter = 0
+	executionInterval      = ExecutionInterval
 
 	logger       *slog.Logger  // Global logger
 	programLevel slog.LevelVar // Info by default
@@ -62,6 +65,15 @@ func init() {
 		apiResourcesToWatch = strings.Split(os.Getenv(APIResourcesToWatchEnv), ",")
 	}
 
+	// Parse the execution interval from the environment
+	if v := os.Getenv(ExecutionIntervalMinutesEnv); v != "" {
+		minutes, err := strconv.Atoi(v)
+		if err != nil || minutes <= 0 {
+			panic(fmt.Sprintf("invalid value for %s: must be a positive integer, got %q", ExecutionIntervalMinutesEnv, v))
+		}
+		executionInterval = time.Duration(minutes) * time.Minute
+	}
+
 }
 
 func main() {
@@ -82,8 +94,8 @@ func main() {
 			logger.Info(fmt.Sprintf("Execution was successful after %d failed attempts, resetting counter to 0", executionFailedCounter))
 			executionFailedCounter = 0
 		}
-		logger.Info(fmt.Sprintf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), ExecutionInterval))
-		time.Sleep(ExecutionInterval)
+		logger.Info(fmt.Sprintf("Execution took %dms, sleeping for %s", time.Since(start).Milliseconds(), executionInterval))
+		time.Sleep(executionInterval)
 	}
 }
 
