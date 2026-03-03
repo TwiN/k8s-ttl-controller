@@ -67,13 +67,21 @@ func init() {
 
 	// Parse the execution interval from the environment
 	if v := os.Getenv(ExecutionIntervalMinutesEnv); v != "" {
-		minutes, err := strconv.Atoi(v)
-		if err != nil || minutes <= 0 {
-			panic(fmt.Sprintf("invalid value for %s: must be a positive integer, got %q", ExecutionIntervalMinutesEnv, v))
+		d, err := parseExecutionIntervalMinutes(v)
+		if err != nil {
+			panic(fmt.Sprintf("invalid value for %s: %s", ExecutionIntervalMinutesEnv, err))
 		}
-		executionInterval = time.Duration(minutes) * time.Minute
+		executionInterval = d
 	}
 
+}
+
+func parseExecutionIntervalMinutes(v string) (time.Duration, error) {
+	minutes, err := strconv.Atoi(v)
+	if err != nil || minutes <= 0 {
+		return 0, fmt.Errorf("must be a positive integer, got %q", v)
+	}
+	return time.Duration(minutes) * time.Minute, nil
 }
 
 func main() {
