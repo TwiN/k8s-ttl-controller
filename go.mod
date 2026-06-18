@@ -5,9 +5,9 @@ go 1.26.0
 require (
 	github.com/TwiN/kevent v0.2.3
 	github.com/xhit/go-str2duration/v2 v2.1.0
-	k8s.io/api v0.36.1
-	k8s.io/apimachinery v0.36.1
-	k8s.io/client-go v0.36.1
+	k8s.io/api v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/client-go v0.36.2
 )
 
 require (
