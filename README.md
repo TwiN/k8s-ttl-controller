@@ -60,6 +60,13 @@ all resources in the cluster. You can specify a comma-separated list of resource
 export API_RESOURCES_TO_WATCH=pods,deployments
 ```
 
+You can use environment variable `EXECUTION_INTERVAL_MINUTES` to configure how often the controller reconciles resources.
+The value must be a positive integer representing the interval in minutes. Defaults to `5`.
+
+```console
+export EXECUTION_INTERVAL_MINUTES=10
+```
+
 ## Deploying on Kubernetes
 ### Using Helm
 For the chart associated to this project, see [TwiN/helm-charts](https://github.com/TwiN/helm-charts):

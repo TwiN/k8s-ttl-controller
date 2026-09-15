@@ -183,6 +183,39 @@ func TestReconcile(t *testing.T) {
 	}
 }
 
+func TestParseExecutionIntervalMinutes(t *testing.T) {
+	scenarios := []struct {
+		input         string
+		expected      time.Duration
+		expectError   bool
+	}{
+		{input: "5", expected: 5 * time.Minute},
+		{input: "1", expected: 1 * time.Minute},
+		{input: "60", expected: 60 * time.Minute},
+		{input: "0", expectError: true},
+		{input: "-1", expectError: true},
+		{input: "abc", expectError: true},
+		{input: "", expectError: true},
+	}
+	for _, scenario := range scenarios {
+		t.Run(scenario.input, func(t *testing.T) {
+			got, err := parseExecutionIntervalMinutes(scenario.input)
+			if scenario.expectError {
+				if err == nil {
+					t.Errorf("expected error for input %q, got nil", scenario.input)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error for input %q: %v", scenario.input, err)
+				}
+				if got != scenario.expected {
+					t.Errorf("expected %v, got %v", scenario.expected, got)
+				}
+			}
+		})
+	}
+}
+
 func newUnstructuredWithAnnotations(apiVersion, kind, namespace, name string, creationTimestamp time.Time, annotations map[string]interface{}) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
